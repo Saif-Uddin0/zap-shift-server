@@ -38,7 +38,7 @@ async function run() {
       if(email){
           query.email = email;
         }
-        const result = await percelCollection.find(query).toArray()
+        const result = await percelCollection.find(query).sort({bookingDate: -1}).toArray()
         res.send(result)
     })
 
