@@ -29,16 +29,21 @@ async function run() {
   try {
     await client.connect();
     const db = client.db("zap_shift_db");
-    const percelCollection = db.collection('parcels')
+    const percelCollection = db.collection('percels')
 
     // percel api
     app.get('/percels' , async(req,res)=>{
-        const result = await percelCollection.find()
+      const query ={}
+      const {email} = req.query;
+      if(email){
+          query.email = email;
+        }
+        const result = await percelCollection.find(query).toArray()
         res.send(result)
     })
 
     // post
-    app.post('percels' , async(req,res)=>{
+    app.post('/percels' , async(req,res)=>{
         const percel = req.body;
         const result = await percelCollection.insertOne(percel)
         res.send(result)
