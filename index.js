@@ -2,7 +2,7 @@ const express = require('express')
 const cors = require('cors');
 const app = express();
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 3000
 
 // middlware
@@ -47,6 +47,14 @@ async function run() {
         const percel = req.body;
         const result = await percelCollection.insertOne(percel)
         res.send(result)
+    })
+
+    // delete
+    app.delete('/percels/:id', async(req , res)=>{
+      const id = req.params.id
+      const query = {_id: new ObjectId(id)}
+      const result = await percelCollection.deleteOne(query);
+      res.send(result)
     })
 
 
