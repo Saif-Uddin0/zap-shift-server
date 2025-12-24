@@ -69,7 +69,7 @@ async function run() {
 
     // payment related apis alternative new
     app.post('/payment-checkout-session', async (req, res) => {
-      const paymentInfo = req.body();
+      const paymentInfo = req.body;
       const amount = parseInt(paymentInfo.cost ) * 100;
       const session = await stripe.checkout.sessions.create({
         line_items: [
@@ -85,10 +85,10 @@ async function run() {
           },
         ],
         mode: 'payment',
+        customer_email: paymentInfo.email,
         metadata: {
           parcelId: paymentInfo.parcelId
         },
-        customer_email: paymentInfo.email,
         success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
       });
@@ -127,6 +127,27 @@ async function run() {
       console.log(session);
       res.send({ url: session.url })
 
+    })
+
+
+    // update api
+
+    app.patch('/payment-success' , async(req,res) =>{
+      const sessionId = req.query.session_id;
+       const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if(session.payment_status === 'paid'){
+        const id = session.metadata.parcelId;
+        const query = {_id: new ObjectId(id)}
+        const update ={
+          $set:{
+            paymentStatus: 'paid',
+          }
+        }
+        const result = await percelCollection.updateOne(query,update)
+        res.send(result)
+      }
+      res.send({success: true})
+      
     })
 
 
