@@ -6,6 +6,13 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const stripe = require('stripe')(process.env.STRIPE_SECRET);
 const crypto = require("crypto")
 const port = process.env.PORT || 3000
+const admin = require("firebase-admin");
+
+const serviceAccount = require("./zap-shit-firebase-adminsdk.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
 
 
@@ -24,6 +31,29 @@ const generateTrackingId = () => {
 // middlware
 app.use(express.json());
 app.use(cors());
+
+// verify firebase token
+const verifyFBToken = async (req, res, next) => {
+  console.log('headers in the middleware', req.headers.authorization);
+  const token = req.headers.authorization;
+
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized access" })
+  }
+
+  try {
+    const idToken = token.split(' ')[1];
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    console.log('decoded in the token', decoded);
+    req.decoded_email = decoded.email;
+    next();
+
+  }
+  catch (err) {
+    return res.status(401).send({ message: 'unauthorized access' })
+  }
+
+}
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@firstproject.7bzasho.mongodb.net/?appName=firstProject`;
 
@@ -46,9 +76,29 @@ async function run() {
     await client.connect();
     const db = client.db("zap_shift_db");
     const percelCollection = db.collection('percels');
-    const paymentCollection = db.collection('payments')
+    const paymentCollection = db.collection('payments');
+    const userCollection = db.collection('users');
+    const ridersCollection = db.collection('riders');
 
-    // percel api
+
+    // user related api
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+      user.role = 'user';
+      user.createdAt = new Date();
+      const email = user.email;
+
+      const userExist = await userCollection.findOne({ email })
+      if (userExist) {
+        return res.send({ message: 'user Already Exist' })
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result)
+    })
+
+
+
+    // percel related api
     app.get('/percels', async (req, res) => {
       const query = {}
       const { email } = req.query;
@@ -269,16 +319,74 @@ async function run() {
 
 
     // payment related api
-    app.get('/payments', async (req, res) => {
+    app.get('/payments', verifyFBToken, async (req, res) => {
       const email = req.query.email;
       const query = {};
+      // console.log('headers', req.headers);
+
       if (email) {
-        query.customerEmail = email
+        query.customerEmail = email;
+        // check the email
+        if (email !== req.decoded_email) {
+          return res.status(403).send({ message: "Forbidden Access" })
+        }
       }
-      const result = await paymentCollection.find(query).toArray();
+      const result = await paymentCollection.find(query).sort({ paidAt: -1 }).toArray();
       res.send(result)
     })
 
+
+    // rider related api
+
+    // rider get
+    app.get('/riders', async (req, res) => {
+      const query = {}
+      if(req.query.status){
+        query.status = req.query.status
+      }
+      const result = await ridersCollection.find(query).toArray();
+      res.send(result)
+    })
+
+
+
+
+    //rider post
+    app.post('/riders', async (req, res) => {
+      const rider = req.body;
+      rider.role = 'user'
+      rider.status = 'pending';
+      rider.createdAt = new Date();
+
+      const result = await ridersCollection.insertOne(rider)
+      res.send(result)
+    })
+
+
+    // rider patch
+    app.patch('/riders/:id' ,verifyFBToken, async(req,res)=>{
+      const status = req.body.status;
+      const id = req.params.id
+      const query = {_id: new ObjectId(id)}
+      const updatedDoc ={
+        $set:{
+          status: status
+        }
+      }
+
+      const result = await ridersCollection.updateOne(query , updatedDoc);
+      if(status === 'approved'){
+        const email = req.body.email;
+        const userQuery = {email}
+        const updateUser = {
+          $set:{
+            role: 'rider'
+          }
+        }
+        const userResult = await userCollection.updateOne(userQuery ,updateUser)
+      }
+      res.send(result)
+    })
 
 
     await client.db("admin").command({ ping: 1 });
