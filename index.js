@@ -34,7 +34,7 @@ app.use(cors());
 
 // verify firebase token
 const verifyFBToken = async (req, res, next) => {
-  console.log('headers in the middleware', req.headers.authorization);
+  // console.log('headers in the middleware', req.headers.authorization);
   const token = req.headers.authorization;
 
   if (!token) {
@@ -44,7 +44,7 @@ const verifyFBToken = async (req, res, next) => {
   try {
     const idToken = token.split(' ')[1];
     const decoded = await admin.auth().verifyIdToken(idToken);
-    console.log('decoded in the token', decoded);
+    // console.log('decoded in the token', decoded);
     req.decoded_email = decoded.email;
     next();
 
@@ -81,7 +81,7 @@ async function run() {
     const ridersCollection = db.collection('riders');
 
 
-    // user related api
+    //-------------- user related api------------------
     app.post('/users', async (req, res) => {
       const user = req.body;
       user.role = 'user';
@@ -96,9 +96,17 @@ async function run() {
       res.send(result)
     })
 
+    // get
+    app.get('/users',verifyFBToken, async(req,res) =>{
+      const result = await userCollection.find().toArray()
+      res.send(result);
+    })
 
 
-    // percel related api
+
+
+
+    //-------------- percel related api-------------------
     app.get('/percels', async (req, res) => {
       const query = {}
       const { email } = req.query;
@@ -132,6 +140,9 @@ async function run() {
       const result = await percelCollection.deleteOne(query);
       res.send(result)
     })
+
+
+    //-------------------- payment api----------------------
 
     // payment related apis alternative new
     app.post('/payment-checkout-session', async (req, res) => {
@@ -318,8 +329,8 @@ async function run() {
 
 
 
-    // payment related api
-    app.get('/payments', verifyFBToken, async (req, res) => {
+    //-------------------- payment related api-----------------
+        app.get('/payments', verifyFBToken, async (req, res) => {
       const email = req.query.email;
       const query = {};
       // console.log('headers', req.headers);
@@ -336,25 +347,30 @@ async function run() {
     })
 
 
-    // rider related api
+    // ---------------------rider related api------------------------
 
     // rider get
     app.get('/riders', async (req, res) => {
       const query = {}
-      if(req.query.status){
+      if (req.query.status) {
         query.status = req.query.status
       }
       const result = await ridersCollection.find(query).toArray();
       res.send(result)
     })
 
-
+    // single rider details get
+    app.get('/riders/:id' , async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await ridersCollection.findOne(query)
+      res.send(result);
+    })
 
 
     //rider post
     app.post('/riders', async (req, res) => {
       const rider = req.body;
-      rider.role = 'user'
       rider.status = 'pending';
       rider.createdAt = new Date();
 
@@ -364,26 +380,26 @@ async function run() {
 
 
     // rider patch
-    app.patch('/riders/:id' ,verifyFBToken, async(req,res)=>{
+    app.patch('/riders/:id', verifyFBToken, async (req, res) => {
       const status = req.body.status;
       const id = req.params.id
-      const query = {_id: new ObjectId(id)}
-      const updatedDoc ={
-        $set:{
+      const query = { _id: new ObjectId(id) }
+      const updatedDoc = {
+        $set: {
           status: status
         }
       }
 
-      const result = await ridersCollection.updateOne(query , updatedDoc);
-      if(status === 'approved'){
+      const result = await ridersCollection.updateOne(query, updatedDoc);
+      if (status === 'approved') {
         const email = req.body.email;
-        const userQuery = {email}
+        const userQuery = { email }
         const updateUser = {
-          $set:{
+          $set: {
             role: 'rider'
           }
         }
-        const userResult = await userCollection.updateOne(userQuery ,updateUser)
+        const userResult = await userCollection.updateOne(userQuery, updateUser)
       }
       res.send(result)
     })
