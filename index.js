@@ -416,7 +416,7 @@ async function run() {
         }
         const userResult = await userCollection.updateOne(userQuery, updateUser)
       }
-      res.send(result)
+      res.send(result);
     })
 
 
