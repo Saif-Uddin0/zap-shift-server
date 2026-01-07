@@ -112,7 +112,13 @@ async function run() {
 
     // get
     app.get('/users',verifyFBToken, async(req,res) =>{
-      const result = await userCollection.find().toArray()
+      const searchText = req.query.searchText;
+      const query = {};
+      if(searchText){
+        query.displayName  = {$regex: searchText , $options: 'i'};
+
+      }
+      const result = await userCollection.find(query).toArray()
       res.send(result);
     })
 
