@@ -8,7 +8,11 @@ const crypto = require("crypto")
 const port = process.env.PORT || 3000
 const admin = require("firebase-admin");
 
-const serviceAccount = require("./zap-shit-firebase-adminsdk.json");
+// const serviceAccount = require("./zap-shit-firebase-adminsdk.json");
+
+// const serviceAccount = require("./firebase-admin-key.json");
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -176,7 +180,7 @@ async function run() {
       const { riderId,
         riderEmail,
         riderName
-       } = req.body;
+      } = req.body;
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
 
@@ -450,8 +454,12 @@ async function run() {
         query.status = req.query.status
       }
       if (district) {
-        query.district = { $regex: `^${district}$`, $options: 'i' };
+        query.district = {
+          $regex: district,
+          $options: 'i'
+        };
       }
+
       // if(workStatus){
       //   query.workStatus = workStatus
       // }
@@ -505,8 +513,8 @@ async function run() {
     })
 
 
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   }
   finally {
 
